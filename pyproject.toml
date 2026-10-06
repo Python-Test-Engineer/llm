@@ -1,7 +1,7 @@
 [project]
 name = "llm"
 version = "0.1.0"
-description = "Add your description here"
+description = "A tiny language model from scratch in plain Python, with an interactive lab app for students"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = []

@@ -183,6 +183,15 @@ def test_examples_rejects_a_too_short_corpus():
         assert exc.code == 400
 
 
+def test_high_learning_rate_is_flagged_as_diverging():
+    """Exercise 1: a too-large lr must produce a visible warning, not silence."""
+    started = _post("/api/train", {"epochs": 20, "lr": 15})
+    status, events, final = _wait_for_job(started["job_id"])
+    kinds = [e["type"] for e in events]
+    assert "warning" in kinds or "error" in kinds, (status, kinds)
+    assert final["loss"] > final["start_loss"], final
+
+
 def _run_all():
     setup_module()
     fns = [v for k, v in sorted(globals().items())

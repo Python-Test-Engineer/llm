@@ -110,7 +110,7 @@ class State:
         job = {
             "id": "", "status": "running", "epoch": 0, "epochs": 0,
             "loss": None, "start_loss": None, "elapsed": 0.0,
-            "events": [], "error": None, "model_key": "",
+            "events": [], "error": None, "model_key": "", "warned": False,
         }
         with self.lock:
             job["id"] = "job_" + secrets.token_hex(6)
@@ -197,6 +197,21 @@ def _train_worker(job: dict, model: MiniLM, epochs: int, lr: float):
                     "perplexity": math.exp(loss),
                     "bits": loss / math.log(2),
                     "sample": model.generate("the ", length=90, temperature=0.5),
+                })
+            # A rising loss that climbs past random guessing means the learning
+            # rate is too high: the step overshoots and the weights blow up.
+            # The numbers can stay finite for a while, so watch the comparison
+            # to the uniform-guess baseline rather than waiting for NaN.
+            baseline = math.log(model.vocab_size)
+            if not job["warned"] and epoch > 2 and loss > baseline * 1.15:
+                job["warned"] = True
+                STATE.add_event(job, {
+                    "type": "warning",
+                    "epoch": epoch, "loss": loss,
+                    "message": ("The loss has climbed to %.2f, worse than random "
+                                "guessing (%.2f). The learning rate is too high -- "
+                                "each step overshoots and the weights are blowing "
+                                "up. Try a smaller lr." % (loss, baseline)),
                 })
             if epoch % 5 == 0 or epoch == epochs:
                 STATE.add_event(job, {

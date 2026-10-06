@@ -4,14 +4,54 @@ This folder is a tiny, readable "language model" — the same core idea behind
 GPT, just a billion times smaller. No numpy, no PyTorch: every multiply and
 add is visible in `mini_llm.py`.
 
+## Two ways to learn with this
+
+- **`uv run llm_lab.py`** — **LLM Lab**, an interactive web app. Walk the seven
+  stages as lessons, turn every knob (learning rate, context, hidden size),
+  watch the loss curve fall, and see the model's next-character predictions
+  and generated text. This is the recommended starting point.
+- **`uv run mini_llm.py`** — the original console walkthrough, heavily
+  commented, printing each step and ending in an interactive prompt. Read this
+  to understand the code; `EXPLAINER.md` explains it line by line.
+
 ## Files
 
 - `mini_llm.py` — the whole thing, heavily commented.
 - `sample_text.txt` — the entire training corpus (a short story about a fox),
   2,396 characters. Edit this and re-run to train on your own text.
 - `EXPLAINER.md` — a full student tutorial: how and why every part works.
+- `llm_lab.py` — start the interactive lab app.
+- `lab/` — the lab: `engine.py` (the model, a faithful port of
+  `mini_llm.py`), `lessons.py` (tutorial content), `server.py` (stdlib-only
+  HTTP server), `static/` (the page).
+- `tests/` — checks that prove the lab's model is the *same* model as
+  `mini_llm.py`, plus end-to-end tests of the web API.
 
-## Run it
+## Run the interactive lab
+
+```
+uv run llm_lab.py
+```
+
+It prints a URL (default <http://127.0.0.1:8000/>) — open it in your browser.
+Nothing to install: the server, the model and the page are all standard
+library plus vanilla JavaScript.
+
+Use `LLM_LAB_PORT=8123` to change the port. In the app:
+
+1. **Corpus & vocabulary** — paste your own text and see the vocabulary change.
+2. **Examples** — type a sentence and see exactly which input/target pairs the
+   model would learn from.
+3. **Network** — change `context` / `embed` / `hidden` and watch the parameter
+   count; after training, see which characters the embeddings decided are alike.
+4. **Train** — a live loss curve (with the `ln(vocab)` random-guess line), a
+   progress bar, and the model's own writing at the 25 / 50 / 75 / 100% marks.
+   Set the learning rate to 12 and watch the loss explode — the app tells you
+   when training has diverged.
+5. **Generate** — the model's top next-character probabilities for any context,
+   and text generation with a temperature slider.
+
+## Run the console version
 
 From the `nn-master` folder:
 
@@ -120,3 +160,24 @@ characters, a **transformer** (attention) instead of a tiny feed-forward
 network, and **billions of parameters + huge data** instead of a few thousand
 parameters + a few paragraphs. The training loop — predict, measure loss,
 backpropagate, nudge — is the same one you're reading here.
+
+## Run the tests
+
+```
+uv run --with pytest pytest tests/ -q      # or, with no installs:
+uv run tests/test_engine.py
+uv run tests/test_server.py
+```
+
+`tests/test_engine.py` checks the arithmetic and the tutorial's numbers, and
+runs `mini_llm.py` itself to confirm the lab's model produces the *same*
+untrained loss (3.3320) — so the app can never silently drift from the script
+it teaches. `tests/test_server.py` starts the real web server and exercises
+every API endpoint end to end, including a full training job.
+
+## Editing the app
+
+The model lives in exactly one place: `lab/engine.py`. `mini_llm.py` stays
+untouched and independently readable on purpose — it is the teaching artefact,
+so it is not refactored into the app. If you change the maths, change it in
+both and run the tests; the parity test will catch a mismatch.

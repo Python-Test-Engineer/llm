@@ -263,11 +263,12 @@ function updateEstimate(nExamples, nParams) {
   const epochs = +$("#trEpochs").value || 1;
   const hidden = +$("#trHidden").value || 24;
   const ex = state._nExamples || 2393;
-  const secs = epochs * ex * 8.5e-5 * (hidden / 24);
+  // Calibrated on the fox corpus: ~0.31 s per epoch at hidden=24.
+  const secs = epochs * ex * 1.3e-4 * (hidden / 24);
   const word = secs < 1 ? "under a second" : secs < 90 ? `about ${Math.round(secs)} seconds` :
     `about ${(secs / 60).toFixed(1)} minutes`;
   $("#trainEstimate").textContent =
-    `${num(epochs)} epochs over ${num(ex)} examples \u00b7 roughly ${word} in this browser session ` +
+    `${num(epochs)} epochs over ${num(ex)} examples \u00b7 takes ${word} in this browser session ` +
     `(the maths runs in Python, one multiply at a time).`;
 }
 
@@ -284,7 +285,7 @@ async function startTraining() {
   state.points = [];
   state.milestones = [];
   state.nextEvent = 0;
-  $("#milestones").innerHTML = `<p class="empty">Training&hellip;</p>`;
+  $("#milestones").innerHTML = `<p class="empty placeholder">Training&hellip;</p>`;
   $("#trainBtn").disabled = true;
   $("#progressBar").style.width = "0%";
   $("#trainStats").innerHTML = "";
@@ -319,7 +320,7 @@ async function pollJob() {
     d.events.forEach((ev) => {
       if (ev.type === "milestone") {
         const final = ev.epoch === d.epochs;
-        $("#milestones").querySelectorAll(".empty").forEach((n) => n.remove());
+        $("#milestones").querySelectorAll(".placeholder").forEach((n) => n.remove());
         const div = document.createElement("div");
         div.className = "milestone" + (final ? " final" : "");
         div.innerHTML = `
@@ -328,11 +329,11 @@ async function pollJob() {
           <div class="mtext">${esc(ev.sample)}</div>`;
         $("#milestones").appendChild(div);
       }
-      if (ev.type === "error") {
+      if (ev.type === "error" || ev.type === "warning") {
         const p = document.createElement("p");
         p.className = "empty";
-        p.style.color = "var(--warn)";
-        p.textContent = ev.message;
+        p.style.color = ev.type === "error" ? "var(--bad)" : "var(--warn)";
+        p.textContent = (ev.type === "warning" ? "\u26a0 " : "") + ev.message;
         $("#milestones").appendChild(p);
       }
       if (ev.type === "done") {
@@ -365,9 +366,10 @@ async function pollJob() {
 }
 
 function renderTrainStats(d) {
+  const worse = d.loss != null && state.randomBaseline != null && d.loss > state.randomBaseline;
   const cells = [
     ["epoch", d.epochs ? `${num(d.epoch)} / ${num(d.epochs)}` : "\u2014", ""],
-    ["loss now", d.loss != null ? d.loss.toFixed(4) : "\u2014", "accent"],
+    ["loss now", d.loss != null ? d.loss.toFixed(4) : "\u2014", worse ? "bad" : "accent"],
     ["start loss", d.start_loss != null ? d.start_loss.toFixed(4) : "\u2014", ""],
     ["random guess", state.randomBaseline != null ? state.randomBaseline.toFixed(4) : "\u2014", "good"],
     ["perplexity", d.loss != null ? Math.exp(d.loss).toFixed(2) : "\u2014", ""],

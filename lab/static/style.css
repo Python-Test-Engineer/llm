@@ -160,6 +160,7 @@ button.ghost { background: transparent; }
 .stat .v { font-size: 19px; font-family: var(--mono); color: var(--text); }
 .stat .v.good { color: var(--accent-2); }
 .stat .v.accent { color: var(--accent); }
+.stat .v.bad { color: var(--bad); }
 
 /* vocab + freq ----------------------------------------------------------- */
 .vocab { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 7px; }

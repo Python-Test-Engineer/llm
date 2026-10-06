@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM Lab &middot; build an LLM from scratch</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">&#9679;</span>
+    <div>
+      <h1>LLM Lab</h1>
+      <p>Build and use a language model from scratch &mdash; companion to <code>mini_llm.py</code></p>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span class="pill" id="modelPill">untrained model</span>
+    <button class="ghost" id="helpBtn" type="button">How to run the CLI</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="rail">
+    <h2>Lessons</h2>
+    <ol id="lessonList" class="lesson-list"></ol>
+
+    <h2>Exercises</h2>
+    <ul id="exerciseList" class="exercise-list"></ul>
+    <p class="hint">Check one off when you have seen it happen with your own hands.</p>
+
+    <h2>Reference</h2>
+    <ul class="links">
+      <li><code>mini_llm.py</code> &mdash; the annotated model</li>
+      <li><code>EXPLAINER.md</code> &mdash; the full tutorial</li>
+      <li><code>README.md</code> &mdash; how to run</li>
+    </ul>
+  </aside>
+
+  <main>
+    <section id="lessonCard" class="lesson-card"></section>
+
+    <nav class="tabs" id="tabs">
+      <button data-tab="corpus" class="active" type="button">1 &middot; Corpus &amp; vocabulary</button>
+      <button data-tab="examples" type="button">2 &middot; Examples</button>
+      <button data-tab="network" type="button">3 &middot; Network</button>
+      <button data-tab="train" type="button">4 &middot; Train</button>
+      <button data-tab="generate" type="button">5 &middot; Generate</button>
+      <button data-tab="compare" type="button">6 &middot; Compare</button>
+    </nav>
+
+    <!-- 1 CORPUS ------------------------------------------------------- -->
+    <section class="panel active" id="panel-corpus">
+      <div class="card">
+        <div class="card-head">
+          <h3>The training corpus</h3>
+          <span class="muted">This is the model's entire world.</span>
+        </div>
+        <textarea id="corpusText" spellcheck="false" rows="9"></textarea>
+        <div class="row">
+          <button id="loadCorpus" class="primary" type="button">Load this corpus</button>
+          <button id="resetCorpus" class="ghost" type="button">Reset to sample_text.txt</button>
+          <span class="muted" id="corpusStatus"></span>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head"><h3>What the model sees</h3></div>
+          <div class="stats" id="corpusStats"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Character frequency</h3>
+            <span class="muted">the most common characters are the easy predictions</span></div>
+          <div class="freq" id="freqChart"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>The vocabulary</h3>
+          <span class="muted">every distinct character, and the integer the network uses for it</span></div>
+        <div class="vocab" id="vocabTable"></div>
+      </div>
+    </section>
+
+    <!-- 2 EXAMPLES ----------------------------------------------------- -->
+    <section class="panel" id="panel-examples">
+      <div class="card">
+        <div class="card-head"><h3>Sliding window</h3>
+          <span class="muted">input &rarr; target, one example for every position</span></div>
+        <div class="row">
+          <label class="field">Text
+            <input id="exProbe" type="text" placeholder="type any sentence&hellip;">
+          </label>
+          <label class="field">context <input id="exContext" type="number" min="1" max="12" value="3"></label>
+          <label class="field">show <input id="exCount" type="number" min="1" max="40" value="10"></label>
+          <button id="exRun" class="primary" type="button">Show examples</button>
+        </div>
+        <table class="tbl" id="exTable">
+          <thead><tr><th>INPUT (ids)</th><th>INPUT</th><th>TARGET</th><th>so the text&hellip;</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="muted" id="exSummary"></p>
+      </div>
+    </section>
+
+    <!-- 3 NETWORK ------------------------------------------------------ -->
+    <section class="panel" id="panel-network">
+      <div class="card">
+        <div class="card-head"><h3>Architecture</h3>
+          <span class="muted">change a size and watch the parameter count</span></div>
+        <div class="row">
+          <label class="field">context <input id="netContext" type="number" min="1" max="12" value="3"></label>
+          <label class="field">embed <input id="netEmbed" type="number" min="1" max="64" value="6"></label>
+          <label class="field">hidden <input id="netHidden" type="number" min="1" max="256" value="24"></label>
+          <button id="netRun" class="primary" type="button">Show architecture</button>
+        </div>
+        <div class="flow" id="flowChart"></div>
+        <table class="tbl" id="shapeTable">
+          <thead><tr><th>name</th><th>role</th><th>shape</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="muted" id="netSummary"></p>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>What the embeddings learned</h3>
+          <span class="muted">nearest characters by embedding &mdash; available after training</span></div>
+        <div id="embeddingPanel" class="embeddings"><p class="empty">Train a model first, then come back.</p></div>
+      </div>
+    </section>
+
+    <!-- 4 TRAIN -------------------------------------------------------- -->
+    <section class="panel" id="panel-train">
+      <div class="card">
+        <div class="card-head"><h3>Training controls</h3></div>
+        <div class="controls">
+          <label class="field">epochs <input id="trEpochs" type="number" min="1" max="2000" value="60"></label>
+          <label class="field">learning rate <input id="trLr" type="number" min="0.01" max="50" step="0.1" value="5"></label>
+          <label class="field">hidden <input id="trHidden" type="number" min="1" max="256" value="24"></label>
+          <label class="field">embed <input id="trEmbed" type="number" min="1" max="64" value="6"></label>
+          <label class="field">context <input id="trContext" type="number" min="1" max="12" value="3"></label>
+          <label class="field">seed <input id="trSeed" type="number" min="0" value="0"></label>
+          <button id="trainBtn" class="primary big" type="button">Train</button>
+          <button id="stopBtn" class="ghost" type="button" disabled>Stop polling</button>
+        </div>
+        <p class="muted" id="trainEstimate"></p>
+        <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+        <div class="stats" id="trainStats"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Loss curve</h3>
+          <span class="muted">down is better; the dashed line is random guessing, ln(vocab)</span></div>
+        <canvas id="lossChart" width="900" height="320"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Sample text along the way</h3>
+          <span class="muted">the model's own writing at the 25 / 50 / 75 / 100% marks</span></div>
+        <div id="milestones" class="milestones"><p class="empty">Press Train to begin.</p></div>
+      </div>
+    </section>
+
+    <!-- 5 GENERATE ----------------------------------------------------- -->
+    <section class="panel" id="panel-generate">
+      <div class="card">
+        <div class="card-head"><h3>What comes next?</h3>
+          <span class="muted">the model's next-character guesses, as probabilities</span></div>
+        <div class="row">
+          <label class="field grow">context <input id="predSeed" type="text" value="the" maxlength="200"></label>
+          <label class="field">top <input id="predK" type="number" min="1" max="28" value="8"></label>
+          <button id="predRun" class="primary" type="button">Predict</button>
+        </div>
+        <div id="predChart" class="predchart"><p class="empty">Train a model, then try a few starting characters.</p></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Generate text</h3></div>
+        <div class="row">
+          <label class="field grow">seed <input id="genSeed" type="text" value="the " maxlength="200"></label>
+          <label class="field">length <input id="genLength" type="number" min="1" max="600" value="200"></label>
+        </div>
+        <div class="row">
+          <label class="field grow">temperature <input id="genTemp" type="range" min="0.05" max="1.5" step="0.05" value="0.5">
+            <output id="genTempOut">0.50</output></label>
+          <button id="genRun" class="primary" type="button">Generate</button>
+        </div>
+        <p class="muted">Low temperature is safe and repetitive; high is creative and often nonsense.</p>
+        <pre id="genOut" class="output">Train a model, then generate some text.</pre>
+      </div>
+    </section>
+
+    <!-- 6 COMPARE ------------------------------------------------------ -->
+    <section class="panel" id="panel-compare">
+      <div class="card">
+        <div class="card-head"><h3>This mini-LLM vs a real LLM</h3>
+          <span class="muted">the same loop; different scale and two extra techniques</span></div>
+        <table class="tbl" id="compareTable">
+          <thead><tr><th>mini-LLM (this lab)</th><th>real LLM (e.g. GPT)</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>The one paragraph</h3></div>
+        <p class="prose">We turned text into numbers, slid a window over it to make
+        &ldquo;predict the next character&rdquo; examples, and built a small network
+        that maps a 3-character context to probabilities over the vocabulary. We
+        measured its wrongness with cross-entropy (starting at the random-guess
+        baseline of ln&nbsp;28&nbsp;=&nbsp;3.33), used backpropagation to find which
+        way each weight should move, and repeated that until the loss fell. Then we
+        generated text by sampling from its predictions one character at a time,
+        with a temperature knob to trade safety for surprise. That is the entire
+        idea behind a language model.</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="modal" id="helpModal" hidden>
+  <div class="modal-box">
+    <button class="modal-close" id="helpClose" type="button">&times;</button>
+    <h3>Run the model from the command line</h3>
+    <p>LLM Lab is a guided view of the same model. To run it as a plain script
+    (the way <code>EXPLAINER.md</code> walks through it), open a terminal in
+    this project folder and run:</p>
+    <pre class="output">uv run mini_llm.py</pre>
+    <p>It prints a six-step walkthrough and ends with an interactive prompt:</p>
+    <pre class="output">seed&gt; start text: the little</pre>
+    <p>Useful flags: <code>--epochs 600</code>, <code>--lr 5</code>,
+    <code>--hidden 48</code>, <code>--context 5</code>, <code>--quiet</code>.
+    Start this lab with <code>uv run llm_lab.py</code> and open the printed URL.</p>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
